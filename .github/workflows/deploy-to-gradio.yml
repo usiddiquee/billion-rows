@@ -19,6 +19,10 @@ jobs:
         with:
           python-version: '3.10'
 
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
       - name: Install huggingface-cli
         run: |
           pip install huggingface_hub
@@ -27,14 +31,20 @@ jobs:
         run: |
           huggingface-cli login --token ${{ secrets.HUGGING_FACE_TOKEN }}
 
-      - name: Deploy to Gradio
-        env:
-          HUGGING_FACE_TOKEN: ${{ secrets.HUGGING_FACE_TOKEN }}
-          GRADIO_APP_ID: ${{ secrets.GRADIO_APP_ID }}
+      - name: Set up Git
         run: |
-          # Force-push to Hugging Face Hub
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git remote add huggingface https://huggingface:${HUGGING_FACE_TOKEN}@huggingface.co/${GRADIO_APP_ID}.git
+
+      - name: Add Hugging Face remote
+        run: |
+          git remote add huggingface https://huggingface:${{ secrets.HUGGING_FACE_TOKEN }}@huggingface.co/${{ secrets.GRADIO_APP_ID }}.git
+
+      - name: Fetch and reset to main
+        run: |
           git fetch huggingface
           git reset --hard origin/main
+
+      - name: Push to Hugging Face Hub
+        run: |
+          git push huggingface main --force

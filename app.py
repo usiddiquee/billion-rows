@@ -107,7 +107,7 @@ def measure_performance(func, *args, **kwargs):
     cpu_after = process.cpu_percent(interval=None)
     mem_after = process.memory_info().rss / (1024 ** 2)
     return result, round(time.time() - start_time, 4), round(cpu_after - cpu_before, 2), round(mem_after - mem_before, 2)
-#File Upload to proceed: 
+#File Upload to proceed:     
 iface = gr.Interface(
     fn=preprocess_file,
     inputs=[gr.File(label="Upload Parquet File")],

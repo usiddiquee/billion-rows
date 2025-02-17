@@ -38,7 +38,7 @@ jobs:
 
       - name: Add Hugging Face remote
         run: |
-          git remote add huggingface https://huggingface:${{ secrets.HUGGING_FACE_TOKEN }}@git.huggingface.co/${{ secrets.GRADIO_APP_ID }}.git
+          git remote add huggingface https://huggingface:${{ secrets.HUGGING_FACE_TOKEN }}@huggingface.co/${{ secrets.GRADIO_APP_ID }}
 
       - name: Fetch and reset to main
         run: |

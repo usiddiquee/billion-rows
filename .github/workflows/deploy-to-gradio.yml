@@ -41,7 +41,7 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
           # Add and commit changes
-          git add.
+          git add .
           git commit -m "Automated deployment from GitHub Actions"
 
           # Push to Hugging Face Hub

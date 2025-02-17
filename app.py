@@ -14,28 +14,17 @@ from clearml import Task
 # Set up ClearML configuration with access key and secret key
 Task.set_credentials(
     api_host="https://api.clear.ml",  # Replace with your ClearML server URL
-    web_host="https://app.clear.ml",   # Replace with your ClearML web URL
-    files_host="https://files.clear.ml",  # Replace with your ClearML files URL
-    key=os.environ.get('CLEARML_API_KEY'),             # Your ClearML access key
-    secret=os.environ.get('CLEARML_API_SECRET')           # Your ClearML secret key
+    web_host="https://app.clear.ml",  # Replace with your ClearML Web URL
+    files_host="https://files.clear.ml",  # Replace with your ClearML Files URL
+    key=os.environ.get('CLEARML_API_KEY'),  # Your ClearML Access Key
+    secret=os.environ.get('CLEARML_API_SECRET')  # Your ClearML Secret Key
 )
 
 # Create a ClearML task
 task = Task.init(project_name="nyc_taxi_trip", task_name="MyTask")
 
-def download_file(url, path):
-    if not os.path.exists(path):
-        gdown.download(url, path, quiet=False)
-        print(f"File downloaded: {path}")
-
-def preprocess_file(file, file_url):
-    if file:
-        file_path = file.name
-    elif file_url:
-        file_path = "nyc_taxiData_01.parquet"
-        download_file(file_url, file_path)
-    else:
-        raise ValueError("Either a file or a file URL must be provided.")
+def preprocess_file(file):
+    file_path = file.name
 
     execution_times = {}
     cpu_usages = {}
@@ -113,7 +102,7 @@ def measure_performance(func, *args, **kwargs):
     start_time = time.time()
     process = psutil.Process()
     cpu_before = process.cpu_percent(interval=None)
-    mem_before = process.memory_info().rss / (1024 ** 2)  # memory in MB
+    mem_before = process.memory_info().rss / (1024 ** 2)  # Memory in MB
     result = func(*args, **kwargs)
     cpu_after = process.cpu_percent(interval=None)
     mem_after = process.memory_info().rss / (1024 ** 2)
@@ -121,10 +110,10 @@ def measure_performance(func, *args, **kwargs):
 
 iface = gr.Interface(
     fn=preprocess_file,
-    inputs=[gr.File(label="Upload Parquet File"), gr.Textbox(label="Or provide a file URL")],
+    inputs=[gr.File(label="Upload Parquet File")],
     outputs=[gr.Image(type="filepath"), gr.Image(type="filepath"), gr.Image(type="filepath"), gr.Image(type="filepath")],
     title="Data Processing Benchmark",
-    description="Benchmark different libraries with a Parquet file (upload or provide a URL)."
+    description="Benchmark different libraries with a Parquet file (upload only)."
 )
 
 iface.launch(share=True)

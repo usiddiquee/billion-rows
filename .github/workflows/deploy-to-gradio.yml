@@ -22,23 +22,30 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Install huggingface-cli
+        run: |
+          pip install huggingface_hub
+
+      - name: Configure huggingface-cli
+        run: |
+          huggingface-cli login --token ${{ secrets.HUGGING_FACE_TOKEN }}
+
       - name: Deploy to Gradio
         env:
           HUGGING_FACE_TOKEN: ${{ secrets.HUGGING_FACE_TOKEN }}
           GRADIO_APP_ID: ${{ secrets.GRADIO_APP_ID }}
         run: |
-          # Install the Hugging Face Hub client library
-          pip install huggingface_hub
-
-          # Login to the Hugging Face Hub
-          huggingface-cli login --token $HUGGING_FACE_TOKEN
-
-          # Push the Gradio app to the Hugging Face Hub
+          # Initialize and configure git repository
+          git init
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
+
+          # Add and commit changes
+          git add.
           git commit -m "Automated deployment from GitHub Actions"
+
+          # Push to Hugging Face Hub
           git push https://huggingface:${HUGGING_FACE_TOKEN}@git.huggingface.co/${GRADIO_APP_ID}.git main
 
-          # Update the Gradio app on the Hugging Face Hub
+          # Update Gradio application
           huggingface-cli gradio update --app-id $GRADIO_APP_ID --model-id $GRADIO_APP_ID --commit-message "Automated deployment from GitHub Actions"

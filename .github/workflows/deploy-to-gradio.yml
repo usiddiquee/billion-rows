@@ -11,6 +11,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -30,17 +32,10 @@ jobs:
           HUGGING_FACE_TOKEN: ${{ secrets.HUGGING_FACE_TOKEN }}
           GRADIO_APP_ID: ${{ secrets.GRADIO_APP_ID }}
         run: |
-          # Initialize and configure git repository
-          git init
+          # Force-push to Hugging Face Hub
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Add and commit changes
-          git add .
-          git commit -m "Automated deployment from GitHub Actions"
-
-          # Push to Hugging Face Hub
-          git push https://huggingface:${HUGGING_FACE_TOKEN}@git.huggingface.co/${GRADIO_APP_ID}.git main
-
-          # Update Gradio application
-          huggingface-cli gradio update --app-id $GRADIO_APP_ID --model-id $GRADIO_APP_ID --commit-message "Automated deployment from GitHub Actions"
+          git remote add huggingface https://huggingface:${HUGGING_FACE_TOKEN}@git.huggingface.co/${GRADIO_APP_ID}.git
+          git fetch huggingface
+          git reset --hard origin/main
+          git push huggingface main --force

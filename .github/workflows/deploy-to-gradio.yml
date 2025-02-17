@@ -29,6 +29,8 @@ jobs:
 
       - name: Configure huggingface-cli
         run: |
+          echo "Hugging Face Token: ${{ secrets.HUGGING_FACE_TOKEN }}"
+          echo "Gradio App ID: ${{ secrets.GRADIO_APP_ID }}"
           huggingface-cli login --token ${{ secrets.HUGGING_FACE_TOKEN }}
 
       - name: Set up Git

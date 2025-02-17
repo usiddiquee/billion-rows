@@ -23,18 +23,19 @@ Task.set_credentials(
 # Create a ClearML task
 task = Task.init(project_name="nyc_taxi_trip", task_name="MyTask")
 
-# Google Drive file URL
-file_url = "https://drive.google.com/file/d/1c253KjIf1A9O8CrKBti7U8UeMLQqi14d/view?usp=sharing"
-
-# Download file if not present
 def download_file(url, path):
     if not os.path.exists(path):
         gdown.download(url, path, quiet=False)
         print(f"File downloaded: {path}")
 
-def preprocess_file():
-    file_path = "nyc_taxiData_01.parquet"
-    download_file(file_url, file_path)
+def preprocess_file(file, file_url):
+    if file:
+        file_path = file.name
+    elif file_url:
+        file_path = "nyc_taxiData_01.parquet"
+        download_file(file_url, file_path)
+    else:
+        raise ValueError("Either a file or a file URL must be provided.")
 
     execution_times = {}
     cpu_usages = {}
@@ -120,10 +121,10 @@ def measure_performance(func, *args, **kwargs):
 
 iface = gr.Interface(
     fn=preprocess_file,
-    inputs=[],
+    inputs=[gr.File(label="Upload Parquet File"), gr.Textbox(label="Or provide a file URL")],
     outputs=[gr.Image(type="filepath"), gr.Image(type="filepath"), gr.Image(type="filepath"), gr.Image(type="filepath")],
     title="Data Processing Benchmark",
-    description="Benchmark different libraries with a file from Google Drive."
+    description="Benchmark different libraries with a Parquet file (upload or provide a URL)."
 )
 
 iface.launch(share=True)

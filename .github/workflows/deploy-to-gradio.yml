@@ -40,7 +40,7 @@ jobs:
 
       - name: Add Hugging Face remote
         run: |
-          git remote add huggingface https://huggingface:${{ secrets.HUGGING_FACE_TOKEN }}@huggingface.co/usiddiquee786/nyc-taxi-trip
+          git remote add huggingface https://huggingface:${{ secrets.HUGGING_FACE_TOKEN }}@huggingface.co/spaces/usiddiquee786/nyc-taxi-trip
 
       - name: Fetch and reset to main
         run: |

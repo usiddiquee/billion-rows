@@ -7,71 +7,59 @@ colorTo: red
 ---
 
 
-# Data Processing Benchmark
+## Data Processing and Benchmarking Tool
 
-This project benchmarks the performance of different data processing libraries when reading a NYC taxi dataset from Google Drive. The results are logged to ClearML and visualized using matplotlib.
+This project provides an interactive web application built using Gradio for benchmarking various Python libraries (Pandas, Polars, DuckDB, and Dask) for NYC Taxi Trip data processing. It leverages ClearML for experiment tracking and logging.
 
-## Libraries Used
-- Gradio
-- time
-- psutil
-- pandas
-- polars
-- duckdb
-- dask
-- gdown
-- matplotlib
-- ClearML
+## Features
+- **Data Information Display:** Upload Parquet files and display dataset information such as shape, columns, data types, and statistics.
+- **Benchmarking Data Processing Libraries:** Compare the performance of Pandas, Polars, DuckDB, and Dask in handling missing values and normalizing data.
+- **Visualization of Results:** Generate bar charts showing execution time, CPU usage, memory usage, and file reading time for each library.
+- **ClearML Integration:** Log metrics and upload generated artifacts to ClearML for tracking and analysis.
 
-## Setup and Installation
-
-1. **Clone the Repository:**
-   ```bash
-   git clone <repository-url>
-   cd <repository-folder>
+## Installation
+1. Clone the repository.
+2. Install dependencies using:
+   ```sh
+   pip install gradio psutil pandas polars duckdb dask matplotlib clearml numpy
    ```
 
-2. **Install Dependencies:**
-   ```bash
-   pip install -r requirements.txt
+3. Set ClearML environment variables:
+   ```sh
+   export CLEARML_API_KEY="your_api_key"
+   export CLEARML_API_SECRET="your_api_secret"
    ```
 
-3. **Set ClearML Credentials:**
-   Add your ClearML API key and secret to the environment variables:
-   ```bash
-   export CLEARML_API_KEY="your-api-key"
-   export CLEARML_API_SECRET="your-secret-key"
-   ```
+## Usage
+Run the application with:
+```sh
+python app.py
+```
+This will launch the Gradio app with a shareable link.
 
-4. **Run the Application:**
-   ```bash
-   python app.py
-   ```
+## Code Highlights
+- **Library Benchmarking:** Measures time, CPU, and memory usage for data operations.
+- **Dynamic UI:** Gradio components update based on user selections.
+- **ClearML Logging:** Logs all metrics and uploads artifacts for easy monitoring.
 
-The Gradio interface will launch, and you can access it through the provided link.
+## Directory Structure
+```
+project-directory/
+│
+├── app.py               # Main application code
+├── requirements.txt     # List of dependencies
+└── README.md            # This readme file
+```
 
-## Key Functions
-- **download_file:** Downloads the dataset from Google Drive.
-- **preprocess_file:** Measures performance metrics (execution time, CPU usage, memory usage) for Pandas, Polars, DuckDB, and Dask.
-- **measure_performance:** Captures execution time, CPU usage, and memory usage.
-
-## Outputs
-- Bar charts comparing execution time, CPU usage, and memory usage across libraries.
-- All charts are uploaded to ClearML as artifacts.
-
-## ClearML Integration
-- Ensure your ClearML server URL, web URL, and files URL are correctly set.
-- Logs performance metrics and uploads generated plots.
-
-## Gradio Interface
-- The interface displays the generated charts directly in the browser.
-- Allows easy sharing of the interface with others.
-
-## Dataset
-- NYC Taxi Trip data in Parquet format, downloaded from Google Drive.
+## Future Enhancements
+- Add support for more preprocessing operations.
+- Enable batch processing for large datasets.
+- Implement additional machine learning workflows.
 
 ## License
-MIT License
+This project is licensed under the MIT License.
+
+
 
 ## Author
 Umar Ahmad Siddiquee

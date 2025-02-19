@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 from clearml import Task
 import os
 import numpy as np
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder, RobustScaler, MaxAbsScaler, PolynomialFeatures
+from scipy.stats import zscore, boxcox
+from sklearn.decomposition import PCA
 
 # Set up ClearML configuration with access key and secret key
 Task.set_credentials(
@@ -41,7 +44,7 @@ def display_data_info(file):
     
     return info_str, columns
 
-def perform_action(file, column, action, normalization):
+def perform_action(file, column, action, normalization, encoding, outlier_method, transformation, feature_engineering, data_reduction):
     # Read the uploaded Parquet file using different libraries
     libraries = {
         "pandas": pd.read_parquet,
@@ -55,6 +58,8 @@ def perform_action(file, column, action, normalization):
     memory_usages = {}
     file_reading_times = {}
     
+    con = None  # Reuse the connection for DuckDB
+    
     for lib, reader in libraries.items():
         try:
             start_time = time.time()
@@ -64,7 +69,8 @@ def perform_action(file, column, action, normalization):
             
             file_reading_start_time = time.time()
             if lib == "duckdb":
-                con = duckdb.connect(':memory:')
+                if con is None:
+                    con = duckdb.connect(':memory:')
                 df = con.execute("SELECT * FROM read_parquet('" + file.name + "')").fetchdf()
             else:
                 df = reader(file)
@@ -87,6 +93,12 @@ def perform_action(file, column, action, normalization):
                         df[column] = (df[column] - df[column].min()) / (df[column].max() - df[column].min())
                     elif normalization == "Standard Scaler":
                         df[column] = (df[column] - df[column].mean()) / df[column].std()
+                    elif normalization == "Robust Scaler":
+                        scaler = RobustScaler()
+                        df[column] = scaler.fit_transform(df[[column]])
+                    elif normalization == "Max Abs Scaler":
+                        scaler = MaxAbsScaler()
+                        df[column] = scaler.fit_transform(df[[column]])
                 elif lib == "polars":
                     if normalization == "Min-Max Scaler":
                         df = df.with_columns([(df[column] - df[column].min()) / (df[column].max() - df[column].min()).alias(column)])
@@ -103,9 +115,120 @@ def perform_action(file, column, action, normalization):
                     elif normalization == "Standard Scaler":
                         df = df.assign(**{column: (df[column] - df[column].mean()) / df[column].std()})
             
+            elif action == "Encode Categorical Variables":
+                if encoding == "One-Hot Encoding":
+                    if lib == "pandas":
+                        df = pd.get_dummies(df, columns=[column])
+                    elif lib == "polars":
+                        df = df.to_dummies(columns=[column])
+                    elif lib == "duckdb":
+                        df = pd.get_dummies(df, columns=[column])
+                    elif lib == "dask":
+                        df = dd.get_dummies(df, columns=[column])
+                elif encoding == "Label Encoding":
+                    if lib == "pandas":
+                        df[column] = LabelEncoder().fit_transform(df[column])
+                    elif lib == "polars":
+                        df = df.with_columns([pl.col(column).cast(pl.Categorical).cast(pl.Int32)])
+                    elif lib == "duckdb":
+                        df[column] = LabelEncoder().fit_transform(df[column])
+                    elif lib == "dask":
+                        df[column] = dd.from_pandas(LabelEncoder().fit_transform(df[column].compute()), npartitions=1)
+            
+            elif action == "Handle Outliers":
+                if outlier_method == "Z-Score Method":
+                    if lib == "pandas":
+                        df = df[(np.abs(zscore(df[column])) < 3)]
+                    elif lib == "polars":
+                        df = df.filter(np.abs(zscore(df[column])) < 3)
+                    elif lib == "duckdb":
+                        df = df[(np.abs(zscore(df[column])) < 3)]
+                    elif lib == "dask":
+                        df = df[(np.abs(zscore(df[column].compute())) < 3)]
+                elif outlier_method == "IQR Method":
+                    Q1 = df[column].quantile(0.25)
+                    Q3 = df[column].quantile(0.75)
+                    IQR = Q3 - Q1
+                    if lib == "pandas":
+                        df = df[~((df[column] < (Q1 - 1.5 * IQR)) | (df[column] > (Q3 + 1.5 * IQR)))]
+                    elif lib == "polars":
+                        df = df.filter(~((df[column] < (Q1 - 1.5 * IQR)) | (df[column] > (Q3 + 1.5 * IQR))))
+                    elif lib == "duckdb":
+                        df = df[~((df[column] < (Q1 - 1.5 * IQR)) | (df[column] > (Q3 + 1.5 * IQR)))]
+                    elif lib == "dask":
+                        df = df[~((df[column].compute() < (Q1 - 1.5 * IQR)) | (df[column].compute() > (Q3 + 1.5 * IQR)))]
+            
+            elif action == "Data Transformation":
+                if transformation == "Log Transformation":
+                    if lib == "pandas":
+                        df[column] = np.log1p(df[column])
+                    elif lib == "polars":
+                        df = df.with_columns([pl.col(column).log1p().alias(column)])
+                    elif lib == "duckdb":
+                        df[column] = np.log1p(df[column])
+                    elif lib == "dask":
+                        df[column] = dd.from_pandas(np.log1p(df[column].compute()), npartitions=1)
+                elif transformation == "Box-Cox Transformation":
+                    if lib == "pandas":
+                        df[column], _ = boxcox(df[column])
+                    elif lib == "polars":
+                        df = df.with_columns([pl.col(column).apply(lambda x: boxcox(x)[0]).alias(column)])
+                    elif lib == "duckdb":
+                        df[column], _ = boxcox(df[column])
+                    elif lib == "dask":
+                        df[column] = dd.from_pandas(boxcox(df[column].compute())[0], npartitions=1)
+            
+            elif action == "Feature Engineering":
+                if feature_engineering == "Polynomial Features":
+                    if lib == "pandas":
+                        poly = PolynomialFeatures(degree=2)
+                        df = pd.DataFrame(poly.fit_transform(df[[column]]), columns=poly.get_feature_names_out([column]))
+                    elif lib == "polars":
+                        df = df.with_columns([pl.col(column).pow(2).alias(f"{column}_squared")])
+                    elif lib == "duckdb":
+                        df[column + "_squared"] = df[column] ** 2
+                    elif lib == "dask":
+                        df[column + "_squared"] = df[column] ** 2
+                elif feature_engineering == "Interaction Terms":
+                    if lib == "pandas":
+                        df[column + "_interaction"] = df[column] * df[column]
+                    elif lib == "polars":
+                        df = df.with_columns([pl.col(column).mul(pl.col(column)).alias(f"{column}_interaction")])
+                    elif lib == "duckdb":
+                        df[column + "_interaction"] = df[column] * df[column]
+                    elif lib == "dask":
+                        df[column + "_interaction"] = df[column] * df[column]
+            
+            elif action == "Data Reduction":
+                if data_reduction == "PCA":
+                    if lib == "pandas":
+                        pca = PCA(n_components=1)
+                        df[column + "_pca"] = pca.fit_transform(df[[column]])
+                    elif lib == "polars":
+                        pca = PCA(n_components=1)
+                        df = df.with_columns([pl.Series(pca.fit_transform(df[[column]]).alias(f"{column}_pca"))])
+                    elif lib == "duckdb":
+                        pca = PCA(n_components=1)
+                        df[column + "_pca"] = pca.fit_transform(df[[column]])
+                    elif lib == "dask":
+                        pca = PCA(n_components=1)
+                        df[column + "_pca"] = dd.from_pandas(pca.fit_transform(df[[column]].compute()), npartitions=1)
+                elif data_reduction == "Feature Selection":
+                    if lib == "pandas":
+                        corr = df.corr()
+                        df = df[corr[column].abs().sort_values(ascending=False).index[:5]]
+                    elif lib == "polars":
+                        corr = df.corr()
+                        df = df.select(corr[column].abs().sort(reverse=True).columns[:5])
+                    elif lib == "duckdb":
+                        corr = df.corr()
+                        df = df[corr[column].abs().sort_values(ascending=False).index[:5]]
+                    elif lib == "dask":
+                        corr = df.corr().compute()
+                        df = df[corr[column].abs().sort_values(ascending=False).index[:5]]
+            
             cpu_after = process.cpu_percent(interval=None)
-            mem_after = process.memory_info().rss / (1024 ** 2)
-            peak_mem_usage = psutil.Process().memory_info().rss / (1024 ** 2)
+            mem_after = process.memory_info().rss / (1024 ** 2)  # Memory in MB
             
             execution_times[lib] = round(time.time() - start_time, 4)
             cpu_usages[lib] = round(cpu_after - cpu_before, 2)
@@ -199,11 +322,16 @@ with demo:
     gr.Markdown("# Data Information and Preprocessing Benchmarking")
     
     file_upload = gr.File(label="Upload Parquet File")
-    info_button = gr.Button("Get Data Information")
+    info_button = gr.Button("Get Data Info")
     info_text = gr.Textbox(label="Data Information")
     column_input = gr.Textbox(label="Enter Column Name")
-    action_input = gr.Dropdown(label="Select Action", choices=["Handle Missing Values", "Normalize Data"])
-    normalization_input = gr.Dropdown(label="Select Normalization Method", choices=["Min-Max Scaler", "Standard Scaler"], visible=False)
+    action_input = gr.Dropdown(label="Select Action", choices=["Handle Missing Values", "Normalize Data", "Encode Categorical Variables", "Handle Outliers", "Data Transformation", "Feature Engineering", "Data Reduction"])
+    normalization_input = gr.Dropdown(label="Select Normalization Method", choices=["Min-Max Scaler", "Standard Scaler", "Robust Scaler", "Max Abs Scaler"], visible=False)
+    encoding_input = gr.Dropdown(label="Select Encoding Method", choices=["One-Hot Encoding", "Label Encoding"], visible=False)
+    outlier_input = gr.Dropdown(label="Select Outlier Handling Method", choices=["Z-Score Method", "IQR Method"], visible=False)
+    transformation_input = gr.Dropdown(label="Select Transformation Method", choices=["Log Transformation", "Box-Cox Transformation"], visible=False)
+    feature_engineering_input = gr.Dropdown(label="Select Feature Engineering Method", choices=["Polynomial Features", "Interaction Terms"], visible=False)
+    data_reduction_input = gr.Dropdown(label="Select Data Reduction Method", choices=["PCA", "Feature Selection"], visible=False)
     action_button = gr.Button("Perform Action")
     results_text = gr.Textbox(label="Results")
     execution_time_image = gr.Image(label="Execution Time")
@@ -218,21 +346,33 @@ with demo:
     )
 
     action_input.change(
-        lambda x: normalization_input.show() if x == "Normalize Data" else normalization_input.hide(),
-        inputs=[action_input],
-        outputs=[normalization_input]
+        lambda x: gr.update(visible=x == "Normalize Data"), inputs=[action_input], outputs=[normalization_input]
+    )
+
+    action_input.change(
+        lambda x: gr.update(visible=x == "Encode Categorical Variables"), inputs=[action_input], outputs=[encoding_input]
+    )
+
+    action_input.change(
+        lambda x: gr.update(visible=x == "Handle Outliers"), inputs=[action_input], outputs=[outlier_input]
+    )
+
+    action_input.change(
+        lambda x: gr.update(visible=x == "Data Transformation"), inputs=[action_input], outputs=[transformation_input]
+    )
+
+    action_input.change(
+        lambda x: gr.update(visible=x == "Feature Engineering"), inputs=[action_input], outputs=[feature_engineering_input]
+    )
+
+    action_input.change(
+        lambda x: gr.update(visible=x == "Data Reduction"), inputs=[action_input], outputs=[data_reduction_input]
     )
 
     action_button.click(
         perform_action,
-        inputs=[file_upload, column_input, action_input, normalization_input],
+        inputs=[file_upload, column_input, action_input, normalization_input, encoding_input, outlier_input, transformation_input, feature_engineering_input, data_reduction_input],
         outputs=[results_text, execution_time_image, cpu_usage_image, memory_usage_image, file_reading_time_image]
-    )
-
-    action_input.change(
-        lambda x: normalization_input.update(visible=True) if x == "Normalize Data" else normalization_input.update(visible=False),
-        inputs=[action_input],
-        outputs=[normalization_input]
     )
 
 demo.launch(share=True)
